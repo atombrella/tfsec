@@ -24,7 +24,7 @@ type Run struct { // https://docs.oasis-open.org/sarif/sarif/v2.1.0/csprd01/sari
 func NewRun(toolName, informationURI string) *Run {
 	run := &Run{
 		Tool: Tool{
-			Driver: &Driver{
+			Driver: &ToolComponent{
 				Name:           toolName,
 				InformationURI: &informationURI,
 			},
@@ -53,8 +53,25 @@ func (run *Run) AddArtifact() *Artifact {
 	return a
 }
 
-// AddRule returns an existing Rule for the ruleID or creates a new Rule and returns a pointer to it
-func (run *Run) AddRule(ruleID string) *Rule {
+// AddDistinctArtifact will handle deduplication of simple artifact additions
+func (run *Run) AddDistinctArtifact(uri string) *Artifact {
+	for _, artifact := range run.Artifacts {
+		if *artifact.Location.URI == uri {
+			return artifact
+		}
+	}
+
+	a := &Artifact{
+		Length: -1,
+	}
+	a.WithLocation(NewSimpleArtifactLocation(uri))
+
+	run.Artifacts = append(run.Artifacts, a)
+	return a
+}
+
+// AddRule returns an existing ReportingDescriptor for the ruleID or creates a new ReportingDescriptor and returns a pointer to it
+func (run *Run) AddRule(ruleID string) *ReportingDescriptor {
 	for _, rule := range run.Tool.Driver.Rules {
 		if rule.ID == ruleID {
 			return rule
@@ -77,7 +94,7 @@ func (run *Run) AttachPropertyBag(pb *PropertyBag) {
 }
 
 // GetRuleById finds a rule by a given rule ID and returns a pointer to it
-func (run *Run) GetRuleById(ruleId string) (*Rule, error) {
+func (run *Run) GetRuleById(ruleId string) (*ReportingDescriptor, error) {
 	if run.Tool.Driver != nil {
 		for _, rule := range run.Tool.Driver.Rules {
 			if rule.ID == ruleId {
@@ -112,6 +129,6 @@ func (run *Run) DedupeArtifacts() error {
 	return nil
 }
 
-func (run *Run) AddProperties(key string, value cty.Value) {
+func (run *Run) AddProperty(key string, value cty.Value) {
 	run.Properties[key] = value
 }
